@@ -90,6 +90,19 @@ without reading what came before or after?
 **Chunk 4** — source: `` — produced by: ``
 
 ```
+======================================================================
+Chunk 4  |  source: thread_office_hours_etiquette.txt#0  |  produced by: chunker.py::fallback_split
+======================================================================
+THREAD: Is it weird to go to office hours with no specific question?
+
+--- reply 1 (44 votes) ---
+No, and this is the single most common thing first years get wrong. 'I'm following the lectures but I don't feel like I understand the shape of it' is a completely normal thing to say.
+
+--- reply 2 (29 votes) ---
+They're usually empty. You are doing the instructor a favour by turning up.
+
+--- reply 3 (18 votes) ---
+If it helps, treat it as a standing appointment. Go every week for a month and it stops feeling like a thing.
 ```
 
 **Chunk 5** — source: `` — produced by: ``
