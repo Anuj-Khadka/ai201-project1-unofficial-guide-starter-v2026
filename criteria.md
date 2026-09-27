@@ -26,6 +26,9 @@ contains the answer.
 <!-- e.g. "One of my questions is about a topic only two documents mention, so
      I expect that one to be hard." -->
 
+I picked 4 of 5 rather than 5 of 5 because one of my questions is about a topic only one documents mention, and the chunk that covers it is short enough that it may not embed close to the question. I didn't go looser than 4 because a retriever that misses two of five questions isn't one I'd trust to build answers on.
+
+
 ---
 
 ## 2. Every answer names a source
@@ -35,6 +38,8 @@ Every answer the system produces names at least one source document.
 **Why this target:**
 <!-- Why all five and not four? What about your setup makes that achievable —
      or what would have to go wrong for it not to be? -->
+
+This is 5 of 5 because naming a source isn't something retrieval has to get right. It's a formatting behavior I control through the prompt and the citation step, so there's no good reason it should ever fail. If it did fail, that would mean the prompt or the output parsing broke, not that the question was hard.
 
 ---
 
@@ -52,10 +57,12 @@ in at least 4 of 5 tries.
 **Why this target:**
 <!-- What did your distances look like when you set the cutoff in Milestone 4?
      Was there a clean gap, or did the two groups overlap? -->
-
+I picked 4 of 5 because one of my out-of-scope questions uses words that also appear in my documents, so I expect it to score close enough to sneak past the gate. The other four are about topics nowhere in the corpus and should be easy to stop.
 ---
 
-## 4. Something about your chunks
+## 4. Size of the chunk
+
+Every chunk should be atleast 8 words in a sentence form. 
 
 <!-- YOU WRITE THIS ONE.
 
@@ -69,7 +76,7 @@ in at least 4 of 5 tries.
        - "No chunk is shorter than 200 characters, since anything below that
           in my corpus turned out to be a heading with no content under it." -->
 
-
+I made this "every chunk" rather than a sample because in Milestone 3 the chunks that failed were headings and list fragments, and those cluster in a few documents where a random sample could miss them. Eight words is the threshold because when I read through my chunks, everything below that was a heading or a stray line with no content, and everything above it was at least one complete sentence.
 
 **Why this target:**
 
@@ -77,7 +84,8 @@ in at least 4 of 5 tries.
 
 ---
 
-## 5. Your choice
+## 5. Sentence format
+Every response that the system produces should be in a passive sentence format.
 
 <!-- YOU WRITE THIS ONE TOO.
 
@@ -91,7 +99,7 @@ in at least 4 of 5 tries.
 
 **Why this target:**
 
-
+I made this all-or-nothing because it's a constraint on generation, not retrieval, so it should hold regardless of what was retrieved or how hard the question was. A looser target would just mean tolerating the prompt being ignored some of the time.
 
 ---
 

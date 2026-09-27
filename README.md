@@ -158,8 +158,7 @@ without reading what came before or after?
      visible. Milestone 4. -->
 
 **Question:**
-When does application open for study abroad?
-What is the maximum working hours during the terms?
+
 
 **Answer:**
 
