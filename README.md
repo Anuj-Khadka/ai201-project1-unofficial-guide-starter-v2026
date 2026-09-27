@@ -85,6 +85,19 @@ without reading what came before or after?
 **Chunk 3** — source: `` — produced by: ``
 
 ```
+======================================================================
+Chunk 3  |  source: thread_laptop_specs.txt#0  |  produced by: chunker.py::fallback_split
+======================================================================
+THREAD: How much laptop do I actually need for CS courses?
+
+--- reply 1 (31 votes) ---
+Less than the recommended spec page says. 16GB of RAM is the one number worth paying for; everything else you'll never notice.
+
+--- reply 2 (18 votes) ---
+Adding: the lab machines exist and are better than anything you'll buy. For the heavy assignments people just use those.
+
+--- reply 3 (12 votes) ---
+I did two years on an 8GB machine and it was fine until the last project, at which point it very much wasn't. 16 is the answer.
 ```
 
 **Chunk 4** — source: `` — produced by: ``
