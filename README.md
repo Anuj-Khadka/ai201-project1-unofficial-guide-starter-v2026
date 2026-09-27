@@ -159,6 +159,7 @@ without reading what came before or after?
 
 **Question:**
 When does application open for study abroad?
+What is the maximum working 
 
 **Answer:**
 
