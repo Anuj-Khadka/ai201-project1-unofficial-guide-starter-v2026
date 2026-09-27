@@ -158,7 +158,7 @@ without reading what came before or after?
      visible. Milestone 4. -->
 
 **Question:**
-> When does application open for study abroad?
+When does application open for study abroad?
 
 **Answer:**
 
