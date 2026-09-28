@@ -29,128 +29,134 @@
 
 ## Chunking Strategy
 
-**Chunk size:**
-**Overlap:**
+**Chunk size:** 240 characters (a packing limit — paragraphs are grouped up to this size and never cut open)
+**Overlap:** 0 characters
+**Split rule:** a document is only split if it has 3 or more body paragraphs
 
-<!-- What about YOUR documents made you pick these numbers? Short posts and
-     long sectioned guides don't want the same chunking, and "800 seemed
-     reasonable" earns nothing. Point at something you noticed when you read
-     the documents in Milestone 1.
+Function: `chunker.py::split_documents`
 
-     If you changed your mind partway through, say so and say why. That's worth
-     more than pretending you got it right first time.
+The starter cut every document into fixed 800-character windows. On this corpus
+that did nothing at all: `campus_life` is 88 documents, the longest is 549
+characters, and not one reaches 800. `python app.py index` reported 88 documents
+and 88 chunks, and `CHUNK_OVERLAP = 120` never executed. Size is not what is
+wrong with these documents.
 
-     Milestone 3. -->
+What is wrong is that the longer ones hold several unrelated thoughts.
+`housing_old_brewhouse.txt` is 549 characters covering the building's history,
+its heating, its laundry prices and its noise. A question about laundry costs
+had to retrieve four topics' worth of text to reach one clause.
+
+So the rule counts **paragraphs, not characters**. I started out planning a
+character threshold and changed my mind: `admin_housing_lottery.txt` is 398
+characters of a single unbroken paragraph, so any character cutoff low enough
+to catch the housing files would also flag that one as long and then find
+nothing in it to split. Paragraph count maps onto what I actually care about —
+whether the document covers more than one thing. 16 of the 88 documents have
+three or more body paragraphs, and those 16 are exactly the templated housing
+and course files.
+
+The second half of the strategy matters more than the split. Every one of these
+documents opens with a bare title line, and **that title is the only place the
+building or course name appears**. The laundry paragraph inside
+`housing_old_brewhouse.txt` never says "Old Brewhouse" anywhere in it. Split on
+paragraphs naively and you produce a chunk reading "Laundry costs $1.50 wash,
+$1.50 dry, coin only" that no question naming the building could ever find. So
+`split_documents` peels the title off and prefixes it to every chunk that
+document produces. Chunk 4 below is the result.
+
+**Overlap is 0 on purpose.** These paragraphs are independent labelled sections
+— `The good:`, `The bad:`, laundry, noise. Carrying the tail of one into the
+next would import an unrelated topic into every chunk, which is the exact
+problem the split is meant to fix. Because I cut on paragraph boundaries, no
+sentence is ever split in half, so there is no broken thought for an overlap to
+repair. `config.CHUNK_OVERLAP` still drives sentence-level overlap if raised
+above 0.
+
+**Results of the change:**
+
+| | Before (`fallback_split`) | After (`split_documents`) |
+|---|---|---|
+| Chunks | 88 | 106 |
+| Average length | 317 chars | 268 chars |
+| Longest chunk | 549 chars | 421 chars |
+| Documents split | 0 | 16 |
+| Best distance, "cost to wash clothes in Old Brewhouse?" | — | 0.173 |
+
+**One thing it does not fix.** The laundry and noise facts share a single
+paragraph in every housing file: *"Laundry costs $1.50 wash, $1.50 dry, coin
+only, and the machines are old. On noise: sound carries strangely..."*. A
+paragraph-level split cannot separate those two. Chunk 4 below still carries
+both. It went from 549 characters to 216, which is enough for retrieval to work,
+but splitting on the `On noise:` sentence is the obvious next move if criterion
+1 misses on a noise question in unit 2.
 
 ## Sample Chunks
 
-<!-- Five chunks, pasted as text. Label each one and name the file it came from
-     AND the function that produced it — the grader checks your code against
-     what you claim here.
+All five produced by `chunker.py::split_documents`. Chunks 1 and 5 come from
+documents left whole (fewer than 3 body paragraphs); chunks 2, 3 and 4 come from
+documents that were split, and show the title prefix doing its job.
 
-     `python app.py chunks -n 5` prints all three for you. Copy them straight
-     across.
-
-     Milestone 3. -->
-
-**Chunk 1** — source: `` — produced by: ``
+**Chunk 1** — source: `admin_add_drop_deadline.txt#0` — produced by: `chunker.py::split_documents`
 
 ```
-======================================================================
-Chunk 1  |  source: thread_bike_commute.txt#0  |  produced by: chunker.py::fallback_split
-======================================================================
-THREAD: Is a bike worth it for a 20 minute walk commute?
+On the add/drop deadline
 
---- reply 1 (14 votes) ---
-Yeah. Cuts an 18 minute walk to about 6. The thing nobody mentions is storage — covered bike parking exists at three buildings and is full by 9am at all three.
-
---- reply 2 (9 votes) ---
-Counterpoint, I sold mine. Between November and March the paths are either icy or salted and salt destroys a drivetrain in one season.
-
---- reply 3 (22 votes) ---
-Both true. I keep a cheap bike for September to November and walk the rest of the year. Total cost was about $120 for the bike and I don't care what happens to it.
-
---- reply 4 (5 votes) ---
-If you do get one, the campus does free registration and it's the only reason I got mine back after it was taken.
-
-For each one, ask: could someone answer a question using only this,
-without reading what came before or after?
+You can add a course through the end of the second week. Dropping is a longer window — through the end of week six — but a drop after week two shows as a W on your transcript. Nothing anywhere on the registrar's site says this plainly, and students find out from each other.
 ```
 
-**Chunk 2** — source: `` — produced by: ``
+Left whole — one body paragraph, one topic, and it names its own subject.
+
+**Chunk 2** — source: `course_biol_160.txt#1` — produced by: `chunker.py::split_documents`
 
 ```
-======================================================================
-Chunk 2  |  source: thread_first_gen.txt#0  |  produced by: chunker.py::fallback_split
-======================================================================
-THREAD: Anything specific for first-generation students?
+BIOL 160 Cell Biology
 
---- reply 1 (33 votes) ---
-The advising office has a specific programme and it is genuinely good, but it is opt-in and badly publicised. Ask for it by name.
-
---- reply 2 (41 votes) ---
-The thing I'd say: the unwritten rules are the hard part, not the coursework. Ask about the unwritten rules explicitly. People are happy to explain them and nobody volunteers them.
-
---- reply 3 (16 votes) ---
-Emergency fund for textbooks and travel exists and is not means-tested beyond a short form.
+The one piece of advice: the unit tests come fast, roughly every three weeks; falling behind once is very hard to recover from.
 ```
 
-**Chunk 3** — source: `` — produced by: ``
+The shortest kind of chunk this produces, at 24 words. Without the prefixed
+title it would be advice about "the unit tests" with no course attached.
+
+**Chunk 3** — source: `housing_old_brewhouse.txt#0` — produced by: `chunker.py::split_documents`
 
 ```
-======================================================================
-Chunk 3  |  source: thread_laptop_specs.txt#0  |  produced by: chunker.py::fallback_split
-======================================================================
-THREAD: How much laptop do I actually need for CS courses?
+Old Brewhouse — what it's actually like
 
---- reply 1 (31 votes) ---
-Less than the recommended spec page says. 16GB of RAM is the one number worth paying for; everything else you'll never notice.
+Took this last spring. Built 1902 as a brewery, converted to housing in 1998. Rooms are doubles and triples with unusual floor plans, no two alike.
 
---- reply 2 (18 votes) ---
-Adding: the lab machines exist and are better than anything you'll buy. For the heavy assignments people just use those.
-
---- reply 3 (12 votes) ---
-I did two years on an 8GB machine and it was fine until the last project, at which point it very much wasn't. 16 is the answer.
+The good: the most characterful building on campus and people get attached to it.
 ```
 
-**Chunk 4** — source: `` — produced by: ``
+Two short paragraphs packed together because they fit inside the 240-character
+limit. On its own, "The good: the most characterful building on campus" is not
+an answer to anything.
+
+**Chunk 4** — source: `housing_old_brewhouse.txt#2` — produced by: `chunker.py::split_documents`
 
 ```
-======================================================================
-Chunk 4  |  source: thread_office_hours_etiquette.txt#0  |  produced by: chunker.py::fallback_split
-======================================================================
-THREAD: Is it weird to go to office hours with no specific question?
+Old Brewhouse — what it's actually like
 
---- reply 1 (44 votes) ---
-No, and this is the single most common thing first years get wrong. 'I'm following the lectures but I don't feel like I understand the shape of it' is a completely normal thing to say.
-
---- reply 2 (29 votes) ---
-They're usually empty. You are doing the instructor a favour by turning up.
-
---- reply 3 (18 votes) ---
-If it helps, treat it as a standing appointment. Go every week for a month and it stops feeling like a thing.
+Laundry costs $1.50 wash, $1.50 dry, coin only, and the machines are old. On noise: sound carries strangely because of the original brick; a room two floors up can be louder than next door.
 ```
 
-**Chunk 5** — source: `` — produced by: ``
+The chunk the whole strategy was built for. Before the change this material was
+buried in a 549-character chunk alongside the building's history and heating.
+It is also the clearest example of the title prefix earning its place: the
+paragraph itself never says "Old Brewhouse".
+
+**Chunk 5** — source: `housing_old_brewhouse_laundry.txt#0` — produced by: `chunker.py::split_documents`
 
 ```
-======================================================================
-Chunk 5  |  source: thread_roommate_conflict.txt#0  |  produced by: chunker.py::fallback_split
-======================================================================
-THREAD: Roommate situation isn't working. What now?
+Laundry in Old Brewhouse
 
---- reply 1 (28 votes) ---
-Talk to your RA early, and frame it as 'we need help sorting this out' rather than 'move me'. Room changes are possible but the process starts with mediation and skipping that step slows it down.
+Machines take $1.50 wash, $1.50 dry, coin only, and the machines are old. There are eight washers and six dryers for the building, which is the wrong ratio and means the dryers back up on Sunday evenings.
 
---- reply 2 (14 votes) ---
-Room changes happen at the semester boundary almost always, and mid-semester only in fairly serious cases.
-
---- reply 3 (33 votes) ---
-Write down specifics before the meeting. 'It's not working' is hard to act on; 'guests four nights a week past 2am' is not.
-
-For each one, ask: could someone answer a question using only this,
-without reading what came before or after?
+Best time to do laundry here is Tuesday or Wednesday morning. Sunday after 6pm you will wait.
 ```
+
+Left whole, and worth including because it states the same $1.50 price as
+chunk 4. My laundry test question has two valid sources, and both now come back
+in the top two results.
 
 ## Sample Answer
 

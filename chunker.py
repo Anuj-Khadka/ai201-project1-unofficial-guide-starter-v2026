@@ -22,6 +22,7 @@ to it, write down what you saw, and move on. That's a real observation about
 your pipeline, not giving up.
 """
 
+import re
 from dataclasses import dataclass
 
 import config
@@ -80,24 +81,132 @@ def fallback_split(
     return chunks
 
 
+_PARAGRAPH_BREAK = re.compile(r"\n\s*\n")
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+
+
+def _paragraphs(text: str) -> list[str]:
+    """
+    Blank-line separated blocks, with CRLF line endings normalised first.
+
+    The corpus files end their lines with \r\n. Splitting on "\n\n" without
+    normalising finds nothing, and every document comes back as one block.
+    """
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    return [block.strip() for block in _PARAGRAPH_BREAK.split(text) if block.strip()]
+
+
+def _title_and_body(blocks: list[str]) -> tuple[str, list[str]]:
+    """
+    Peel the heading off the top of a document.
+
+    Every campus_life document opens with a bare title line — "Laundry in Old
+    Brewhouse", "CS 340 Databases" — on its own, with no sentence punctuation.
+    It matters because it is the only place the building or course name
+    appears: the laundry paragraph of housing_old_brewhouse.txt never says
+    "Old Brewhouse" anywhere in it.
+    """
+    if len(blocks) > 1:
+        first = blocks[0]
+        if "\n" not in first and len(first) <= 90 and not first.endswith((".", "!", "?")):
+            return first, blocks[1:]
+    return "", blocks
+
+
+def _pack(paragraphs: list[str], limit: int) -> list[str]:
+    """
+    Group consecutive paragraphs into bodies no longer than `limit` characters.
+
+    Never cuts inside a paragraph, so no sentence is ever split in half. The
+    limit only decides whether two neighbours travel together: 62 of the 183
+    body paragraphs in this corpus are under 100 characters, and on their own
+    those are fragments rather than answers.
+    """
+    bodies: list[str] = []
+    current = ""
+    for paragraph in paragraphs:
+        if not current:
+            current = paragraph
+        elif len(current) + 2 + len(paragraph) <= limit:
+            current = f"{current}\n\n{paragraph}"
+        else:
+            bodies.append(current)
+            current = paragraph
+    if current:
+        bodies.append(current)
+    return bodies
+
+
+def _carried_sentence(previous: str, budget: int) -> str:
+    """The last sentence of `previous`, when overlap is switched on."""
+    if budget <= 0:
+        return ""
+    sentences = [s.strip() for s in _SENTENCE_END.split(previous) if s.strip()]
+    if not sentences or len(sentences[-1]) > budget:
+        return ""
+    return sentences[-1]
+
+
 def split_documents(documents: list[Document]) -> list[Chunk]:
     """
-    Split documents into chunks. ⚠️ REPLACE THE BODY OF THIS IN MILESTONE 3.
+    Split only the documents that hold more than one thought, and prefix the
+    title line to every piece.
 
-    Right now it just calls the fallback. That is the plain, generic behaviour
-    the brief is talking about.
+    Why not fixed character windows: every document in campus_life is under
+    550 characters, so the starter's 800-character window never cut anything.
+    88 documents came out as 88 chunks and CHUNK_OVERLAP was dead code. Size
+    is not what is wrong with these documents.
 
-    When you write your own strategy, set `produced_by` to
-    "chunker.py::split_documents" so your README's Sample Chunks section names
-    the right function. `app.py chunks` prints that string for you.
+    What is wrong is that the longer ones cover several unrelated topics at
+    once. housing_old_brewhouse.txt runs to 549 characters and covers the
+    building's history, heating, laundry prices and noise, so a question about
+    laundry retrieves four topics' worth of text to get one clause.
 
-    Things worth thinking about before you write any code:
-      - Are your documents short posts or long guides?
-      - Is the useful information in one sentence, or spread over a paragraph?
-      - Would splitting on paragraph breaks keep more thoughts intact than
-        splitting on a character count?
+    So: documents with fewer than MIN_PARAGRAPHS_TO_SPLIT body paragraphs stay
+    whole, and longer ones are cut on paragraph boundaries. The rule counts
+    paragraphs rather than characters because length alone says nothing here —
+    admin_housing_lottery.txt is 398 characters of a single unbroken paragraph
+    that a character rule would flag as long and then fail to split.
+
+    Every chunk from a split document carries the title line, so a chunk about
+    laundry costs still says "Old Brewhouse" and can be retrieved by a question
+    that names the building.
     """
-    return fallback_split(documents)
+    limit = config.CHUNK_SIZE
+    overlap_budget = config.CHUNK_OVERLAP
+    split_at = config.MIN_PARAGRAPHS_TO_SPLIT
+
+    chunks: list[Chunk] = []
+
+    for doc in documents:
+        blocks = _paragraphs(doc.text)
+        if not blocks:
+            continue
+
+        title, body = _title_and_body(blocks)
+
+        if len(body) < split_at:
+            # One thought, one chunk. Keep the document exactly as it is.
+            bodies = ["\n\n".join(body)]
+        else:
+            bodies = _pack(body, limit)
+
+        for index, text in enumerate(bodies):
+            if index > 0:
+                carried = _carried_sentence(bodies[index - 1], overlap_budget)
+                if carried:
+                    text = f"{carried}\n\n{text}"
+
+            chunks.append(
+                Chunk(
+                    text=f"{title}\n\n{text}" if title else text,
+                    source=doc.source,
+                    index=index,
+                    produced_by="chunker.py::split_documents",
+                )
+            )
+
+    return chunks
 
 
 def describe(chunks: list[Chunk]) -> str:

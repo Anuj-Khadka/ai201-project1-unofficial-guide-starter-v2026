@@ -27,8 +27,25 @@ CORPUS = os.getenv("AI201_CORPUS", "campus_life")
 # These are deliberately plain, generic numbers. Milestone 3 is where you
 # replace them with numbers that fit the documents you actually read.
 
-CHUNK_SIZE = 800        # characters per chunk
-CHUNK_OVERLAP = 120     # characters shared between neighbouring chunks
+# A document is only split when it has at least this many body paragraphs.
+# Counted in paragraphs, not characters: every document here is already under
+# 550 characters, so length says nothing about whether a document holds more
+# than one thought. 16 of the 88 documents clear this bar, and they are the
+# templated housing and course files that cover several topics at once.
+MIN_PARAGRAPHS_TO_SPLIT = 3
+
+# Packing limit for a split document, in characters. Paragraphs are grouped up
+# to this size and never cut open, so no sentence is split in half. 240 sits
+# just above the 90th percentile of body-paragraph length (232), so nearly
+# every paragraph stands as its own chunk, while the short "The good:" /
+# "The bad:" lines pair up with a neighbour instead of becoming fragments.
+CHUNK_SIZE = 240
+
+# 0 on purpose. Paragraphs in this corpus are independent labelled sections,
+# so carrying the tail of one into the next would import an unrelated topic
+# into every chunk — the exact problem splitting is meant to fix. Raise it
+# above 0 to switch sentence-level overlap back on.
+CHUNK_OVERLAP = 0
 
 
 # ─── Retrieval (Milestone 4) ─────────────────────────────────────────────────
