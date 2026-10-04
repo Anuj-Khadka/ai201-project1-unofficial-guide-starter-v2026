@@ -32,7 +32,7 @@ CORPUS = os.getenv("AI201_CORPUS", "campus_life")
 # 550 characters, so length says nothing about whether a document holds more
 # than one thought. 16 of the 88 documents clear this bar, and they are the
 # templated housing and course files that cover several topics at once.
-MIN_PARAGRAPHS_TO_SPLIT = 3
+MIN_PARAGRAPHS_TO_SPLIT = 2
 
 # Packing limit for a split document, in characters. Paragraphs are grouped up
 # to this size and never cut open, so no sentence is split in half. 240 sits

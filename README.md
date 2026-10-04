@@ -31,7 +31,7 @@
 
 **Chunk size:** 240 characters (a packing limit — paragraphs are grouped up to this size and never cut open)
 **Overlap:** 0 characters
-**Split rule:** a document is only split if it has 3 or more body paragraphs
+**Split rule:** a document is split if it has 2 or more body paragraphs
 
 Function: `chunker.py::split_documents`
 
@@ -41,19 +41,16 @@ characters, and not one reaches 800. `python app.py index` reported 88 documents
 and 88 chunks, and `CHUNK_OVERLAP = 120` never executed. Size is not what is
 wrong with these documents.
 
-What is wrong is that the longer ones hold several unrelated thoughts.
+What is wrong is that they bundle unrelated facts together.
 `housing_old_brewhouse.txt` is 549 characters covering the building's history,
-its heating, its laundry prices and its noise. A question about laundry costs
+its heating, its laundry prices and its noise, so a question about laundry costs
 had to retrieve four topics' worth of text to reach one clause.
 
-So the rule counts **paragraphs, not characters**. I started out planning a
-character threshold and changed my mind: `admin_housing_lottery.txt` is 398
-characters of a single unbroken paragraph, so any character cutoff low enough
-to catch the housing files would also flag that one as long and then find
-nothing in it to split. Paragraph count maps onto what I actually care about —
-whether the document covers more than one thing. 16 of the 88 documents have
-three or more body paragraphs, and those 16 are exactly the templated housing
-and course files.
+So the rule counts **paragraphs, not characters**. A character threshold doesn't
+work here: `admin_housing_lottery.txt` is 398 characters of a single unbroken
+paragraph, so any cutoff low enough to catch the housing files would flag that
+one as long and then find nothing in it to split. Paragraph count maps onto what
+I actually care about — whether the document covers more than one thing.
 
 The second half of the strategy matters more than the split. Every one of these
 documents opens with a bare title line, and **that title is the only place the
@@ -72,29 +69,74 @@ sentence is ever split in half, so there is no broken thought for an overlap to
 repair. `config.CHUNK_OVERLAP` still drives sentence-level overlap if raised
 above 0.
 
+### I changed the split rule partway through, and here is why
+
+I first set the rule at **3 or more body paragraphs**. That was the conservative
+choice: it split only the 16 templated housing and course files, the ones I
+could see were obviously multi-topic, and left everything else alone.
+
+Milestone 4 showed me it was wrong. Running my five test questions through
+retrieval, "What is the maximum working hours during the terms?" came back with
+`course_stat_150_workload.txt` at rank 1 — **the wrong document** — at a distance
+of 0.5313, beating the correct `money_jobs.txt` at 0.5339 by 0.0026. Four of the
+five results were course workload files, because "working hours" embeds close to
+"Workload for X… hours a week".
+
+The cause was my own rule. `money_jobs.txt` has a title and exactly two body
+paragraphs:
+
+```
+On-campus work
+  para 1   Library and dining jobs post in the first week of each semester…
+  para 2   Maximum is 20 hours a week during term. Most people find 10 to 12…
+```
+
+At a 3-paragraph rule it stays whole, so the one sentence that answers the
+question is diluted by a paragraph about job postings. Dropping the rule to 2
+isolates it, and the distance goes from 0.5339 to **0.3483** at rank 1. The same
+thing happened to `transit_shuttle.txt` — also two paragraphs, schedule then
+student-ID trivia — which went from 0.4093 to **0.2071**.
+
+A 0.0026 margin is noise, not a result, and my relevance gate only inspects the
+*best* distance. At the 3-paragraph rule the gate would have passed that question
+on the strength of a chunk about STAT 150's reading load — the right decision for
+the wrong reason. So I lowered the rule to 2.
+
+The usual objection to smaller chunks is that they lose the context that made the
+sentence mean anything. That doesn't apply here, because the title prefix keeps
+every chunk naming its own subject: `On-campus work / Maximum is 20 hours a week
+during term` stands alone perfectly well.
+
 **Results of the change:**
 
-| | Before (`fallback_split`) | After (`split_documents`) |
-|---|---|---|
-| Chunks | 88 | 106 |
-| Average length | 317 chars | 268 chars |
-| Longest chunk | 549 chars | 421 chars |
-| Documents split | 0 | 16 |
-| Best distance, "cost to wash clothes in Old Brewhouse?" | — | 0.173 |
+| | Starter (`fallback_split`) | Rule = 3 paragraphs | Rule = 2 (final) |
+|---|---|---|---|
+| Chunks | 88 | 106 | **142** |
+| Average length | 317 chars | 268 chars | **206 chars** |
+| Longest chunk | 549 chars | 421 chars | **397 chars** |
+| Documents split | 0 | 16 | **52** |
+| Smallest chunk | — | 24 words | **15 words** |
+| Worst in-corpus distance | — | 0.5313 (wrong doc) | **0.3483** |
+| Gap to out-of-scope group | — | 0.29 | **0.48** |
+
+The smallest chunk at 15 words still clears criterion 4's 8-word floor, which is
+what the packing limit is for: 62 of the 183 body paragraphs in this corpus are
+under 100 characters, and on their own those would be fragments rather than
+answers. Packing folds them into a neighbour instead.
 
 **One thing it does not fix.** The laundry and noise facts share a single
 paragraph in every housing file: *"Laundry costs $1.50 wash, $1.50 dry, coin
-only, and the machines are old. On noise: sound carries strangely..."*. A
+only, and the machines are old. On noise: sound carries strangely…"*. A
 paragraph-level split cannot separate those two. Chunk 4 below still carries
-both. It went from 549 characters to 216, which is enough for retrieval to work,
-but splitting on the `On noise:` sentence is the obvious next move if criterion
-1 misses on a noise question in unit 2.
+both. It went from 549 characters to 230, which is enough for retrieval to work,
+but splitting on the `On noise:` sentence is the obvious next move if a noise
+question misses in unit 2.
 
 ## Sample Chunks
 
-All five produced by `chunker.py::split_documents`. Chunks 1 and 5 come from
-documents left whole (fewer than 3 body paragraphs); chunks 2, 3 and 4 come from
-documents that were split, and show the title prefix doing its job.
+All five produced by `chunker.py::split_documents`. Chunk 1 comes from a
+document left whole (one body paragraph); the rest come from documents that were
+split, and show the title prefix doing its job.
 
 **Chunk 1** — source: `admin_add_drop_deadline.txt#0` — produced by: `chunker.py::split_documents`
 
@@ -104,7 +146,7 @@ On the add/drop deadline
 You can add a course through the end of the second week. Dropping is a longer window — through the end of week six — but a drop after week two shows as a W on your transcript. Nothing anywhere on the registrar's site says this plainly, and students find out from each other.
 ```
 
-Left whole — one body paragraph, one topic, and it names its own subject.
+Left whole — one body paragraph, one topic, and it names its own subject. 58 words.
 
 **Chunk 2** — source: `course_biol_160.txt#1` — produced by: `chunker.py::split_documents`
 
@@ -114,8 +156,8 @@ BIOL 160 Cell Biology
 The one piece of advice: the unit tests come fast, roughly every three weeks; falling behind once is very hard to recover from.
 ```
 
-The shortest kind of chunk this produces, at 24 words. Without the prefixed
-title it would be advice about "the unit tests" with no course attached.
+Near the short end at 27 words. Without the prefixed title this would be advice
+about "the unit tests" with no course attached to it.
 
 **Chunk 3** — source: `housing_old_brewhouse.txt#0` — produced by: `chunker.py::split_documents`
 
@@ -142,7 +184,8 @@ Laundry costs $1.50 wash, $1.50 dry, coin only, and the machines are old. On noi
 The chunk the whole strategy was built for. Before the change this material was
 buried in a 549-character chunk alongside the building's history and heating.
 It is also the clearest example of the title prefix earning its place: the
-paragraph itself never says "Old Brewhouse".
+paragraph itself never says "Old Brewhouse". It retrieves at 0.1726, the best
+distance of any of my five questions.
 
 **Chunk 5** — source: `housing_old_brewhouse_laundry.txt#0` — produced by: `chunker.py::split_documents`
 
@@ -150,41 +193,95 @@ paragraph itself never says "Old Brewhouse".
 Laundry in Old Brewhouse
 
 Machines take $1.50 wash, $1.50 dry, coin only, and the machines are old. There are eight washers and six dryers for the building, which is the wrong ratio and means the dryers back up on Sunday evenings.
-
-Best time to do laundry here is Tuesday or Wednesday morning. Sunday after 6pm you will wait.
 ```
 
-Left whole, and worth including because it states the same $1.50 price as
-chunk 4. My laundry test question has two valid sources, and both now come back
-in the top two results.
+Worth including because it states the same $1.50 price as chunk 4, from a
+different file. My laundry question has two valid sources and both come back in
+the top two results. This file also split under the 2-paragraph rule — the "best
+time to do laundry is Tuesday or Wednesday morning" advice is now chunk `#1`,
+separate from the price.
 
 ## Sample Answer
 
-<!-- One complete question and answer, pasted as text, with the source line
-     visible. Milestone 4. -->
-
-**Question:**
-
+**Question:** What is the maximum working hours during the terms?
 
 **Answer:**
 
 ```
+  (best distance 0.348, cutoff 0.6)
+
+The maximum on-campus working hours during the term is 20 hours a week (money_jobs.txt).
+
+Sources retrieved: course_econ_101_workload.txt, course_engl_205_workload.txt, course_phys_130_workload.txt, course_stat_150_workload.txt, money_jobs.txt
+
+1 model calls this session, 518 tokens (494 in, 24 out)
 ```
 
-**My relevance cutoff:**
+This is the question that drove my chunking change, so it is the one worth
+showing. It also exposes something I have not fixed: **four of the five
+retrieved sources are irrelevant course workload files.** The model used only
+`money_jobs.txt`, which is the grounding instruction in `generate.py` working
+correctly on top of noisy retrieval — but `TOP_K = 5` is still feeding the model
+four chunks it should not have been sent.
 
-<!-- The number you set in config.py, and how you got there.
+And the refusal case, which is criterion 3:
 
-     You ran five questions your corpus covers and the five in OUT_OF_SCOPE
-     that it clearly doesn't, and wrote down the best distance for each. What
-     did those two groups look like? Where was the gap? Put the actual numbers
-     here — the table below wants all ten rows.
+```
+> python app.py ask "What is the capital of Mongolia?"
+  (best distance 0.825, cutoff 0.6)
 
-     Milestone 4. -->
+I don't have enough information about that.
 
-| Question | In corpus? | Best distance |
-|---|---|---|
-|  |  |  |
+0 model calls this session
+```
+
+Note `0 model calls` — the gate stopped it before the model was ever reached, so
+a refused question costs no quota.
+
+**My relevance cutoff: 0.6**
+
+This is the number the starter ships with, but I verified it rather than
+inheriting it. I ran all five of my test questions and all five of the
+`OUT_OF_SCOPE` ones and recorded the best distance for each:
+
+| Question | In corpus? | Best distance | Top source |
+|---|---|---|---|
+| How much does it cost to wash clothes in Old Brewhouse? | yes | 0.1726 | `housing_old_brewhouse.txt` |
+| What time does the campus shuttle run on the weekdays? | yes | 0.2071 | `transit_shuttle.txt` |
+| When does application open for study abroad? | yes | 0.2523 | `admin_study_abroad.txt` |
+| What is the assessment pattern for STAT 150 Applied Statistics? | yes | 0.2732 | `course_stat_150_exams.txt` |
+| What is the maximum working hours during the terms? | yes | 0.3483 | `money_jobs.txt` |
+| What is the capital of Mongolia? | no | 0.8246 | `course_hist_118_exams.txt` |
+| What is the recommended dosage of ibuprofen for a headache? | no | 0.8477 | `course_hist_118.txt` |
+| How do I write a for loop in Rust? | no | 0.8768 | `course_engl_205.txt` |
+| Who won the 1994 World Cup? | no | 0.8859 | `course_hist_118_exams.txt` |
+| How do I change the oil in a diesel engine? | no | 0.9231 | `dining_verrill_street_grill.txt` |
+
+**The two groups:** in-corpus questions land between **0.17 and 0.35**.
+Out-of-scope questions land between **0.82 and 0.93**. There is no overlap at
+all — the gap runs from 0.3483 to 0.8246, which is 0.48 wide, wider than either
+group. The midpoint is 0.586, so 0.6 sits almost exactly in the middle with
+roughly 0.25 of margin on each side.
+
+I left it at 0.6 rather than moving it to the exact midpoint because a round
+number is easier to reason about and the extra 0.014 buys nothing. I would only
+move it if a real question started landing above 0.4, which would mean the
+in-corpus group had grown a tail I need to cover.
+
+**What a wrong cutoff would cost me.** At 0.3 the system would refuse the work
+hours question, the shuttle question and the study abroad question — three of my
+five — all of which it can answer. At 0.9 it would accept four of the five
+out-of-scope questions and hand the model chunks about history exams to answer a
+question about Mongolia.
+
+**Top-k is still 5.** I tested 8 on the STAT 150 question and the correct chunk
+was already at rank 1, so a larger k only added noise. The real problem is in
+the other direction, visible in the sample answer above: the gate only inspects
+the single best distance, so once one chunk passes, all five go to the model
+including ones further away than the cutoff I just set. On the study abroad
+question, results 3, 4 and 5 sit at 0.656, 0.685 and 0.700 — all worse than 0.6,
+all sent anyway. Filtering every retrieved chunk against the threshold, rather
+than just the closest one, is the first thing I would change.
 
 ## How I Used AI
 
