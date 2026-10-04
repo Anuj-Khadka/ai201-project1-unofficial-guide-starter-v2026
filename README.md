@@ -2,24 +2,29 @@
 
 <!-- Replace this line with your name and which corpus you picked. -->
 
-> **This file is your submission.** Fill it in as you go — most sections get
-> written during the milestone that produces them, not at the end.
->
-> How the starter works, and every command you'll need, is in `RUNNING.md`.
-> Leave that file alone.
->
-> **Paste everything as text.** No screenshots, no video. A typed table gets
-> full credit; a picture of the same table gets none.
->
-> Delete these instruction blocks as you replace them. The `<!-- -->` comments
-> are notes to you and don't show up when the page renders — you can leave them
-> or remove them.
+**Anuj Khadka (corpus: `campus_life`)**
 
 ---
 
 # Unit 1
 
 ## What This Does
+
+This answers questions about one university using `campus_life`, a corpus of 88 
+short posts written by students: which dorm has uneven heating, how long the
+queue at a dining hall runs at noon, what a course's assessment actually looks
+like, how the add/drop deadline really works. You ask a plain question —
+"How much does it cost to wash clothes in Old Brewhouse?" — and it answers from
+those posts and names the file the answer came from.
+
+Under the hood it splits each post into paragraph-sized chunks, embeds them
+locally into a Chroma vector store, and retrieves the five nearest to your
+question. A relevance gate checks the closest match against a 0.6 cutoff before
+the model is called at all, so a question the corpus doesn't cover gets
+"I don't have enough information about that" instead of a confident guess, and
+costs no API quota.
+
+Run it with `python app.py ask "your question here"`.
 
 <!-- Three or four sentences. Which corpus you picked, and the kinds of
      questions your system answers. Write it for someone who has never seen
@@ -285,6 +290,7 @@ than just the closest one, is the first thing I would change.
 
 ## How I Used AI
 
+
 <!-- Two specific moments. For each: what you asked for, what came back, and
      what you changed about it.
 
@@ -294,9 +300,30 @@ than just the closest one, is the first thing I would change.
 
      Milestone 5. -->
 
-**1.**
+**1. The chunker that didn't chunk.** I described my corpus to Claude — 88 short
+posts, a title line then two to five paragraphs, the longest 549 characters —
+and asked for a chunking strategy. Before that I had tried the change myself,
+and what I actually changed was the `produced_by` string inside
+`fallback_split` from `"chunker.py::fallback_split"` to
+`"chunker.py::split_documents"`. That made my README cite the right function
+name while the splitting logic stayed exactly as the starter shipped it.
+`python app.py index` gave me 88 chunks at 317 characters average, shortest 178,
+longest 549 — byte-identical to the run before it. That identical summary line
+is how it got caught. What I took from it: the index summary is the test. If the
+numbers don't move, nothing happened, no matter what the label says.
 
-**2.**
+**2. Not taking the recommendation.** Claude proposed splitting only documents
+with 3 or more body paragraphs, and I used it. Milestone 4 showed it was wrong —
+on "What is the maximum working hours during the terms?", the wrong document
+(`course_stat_150_workload.txt`, 0.5313) beat the right one (`money_jobs.txt`,
+0.5339) by 0.0026, because `money_jobs.txt` has exactly two paragraphs and never
+got split. Rather than accept a second recommendation, I asked for both rules
+measured across all ten of my questions. The data decided it: at a 2-paragraph
+rule that question went to 0.3483 at rank 1, the shuttle question went from
+0.4093 to 0.2071, nothing regressed, and the gap between my in-corpus and
+out-of-scope groups went from 0.29 to 0.48. I changed the rule I'd been given,
+on evidence I asked for rather than on the advice itself.
+
 
 <!-- ── Stretch features ─────────────────────────────────────────────────────
      Doing one? Say so here BEFORE you start. A feature this README never
