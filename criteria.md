@@ -62,44 +62,37 @@ I picked 4 of 5 because one of my out-of-scope questions uses words that also ap
 
 ## 4. Size of the chunk
 
-Every chunk should be atleast 8 words in a sentence form. 
-
-<!-- YOU WRITE THIS ONE.
-
-     How would you know if your chunks were the right size? Name something
-     countable or observable.
-
-     Examples of the right shape — don't copy these, they should come from
-     what you actually saw in Milestone 3:
-       - "At least 4 of 5 sampled chunks read as a complete thought, with no
-          sentence cut in half at either end."
-       - "No chunk is shorter than 200 characters, since anything below that
-          in my corpus turned out to be a heading with no content under it." -->
-
-I made this "every chunk" rather than a sample because in Milestone 3 the chunks that failed were headings and list fragments, and those cluster in a few documents where a random sample could miss them. Eight words is the threshold because when I read through my chunks, everything below that was a heading or a stray line with no content, and everything above it was at least one complete sentence.
+Every chunk should be at least 8 words and read as at least one complete sentence.
 
 **Why this target:**
 
-
+I made this "every chunk" rather than a sample because the chunks most likely to
+fail are title lines and one-line fragments, and those cluster in a few
+documents where a random sample of five could miss them entirely. Eight words is
+the threshold because my chunker packs any paragraph under 100 characters into
+its neighbour rather than emitting it alone, and 62 of the 183 body paragraphs
+in `campus_life` are that short — so if the packing step ever fails to fire, a
+bare heading is exactly what I would get, and a bare heading in this corpus is
+three to six words.
 
 ---
 
-## 5. Sentence format
-Every response that the system produces should be in a passive sentence format.
+## 5. The source an answer names is the one the fact came from
 
-<!-- YOU WRITE THIS ONE TOO.
-
-     Pick something you actually care about getting right. It could be about
-     speed, about refusals, about a particular kind of question your corpus
-     handles badly, about source attribution being correct rather than merely
-     present — anything, as long as it names a number or an observable
-     outcome. -->
-
-
+For at least 4 of my 5 test questions, the fact in the answer can be found in
+the document the answer names. Where two documents both contain the fact,
+naming either one counts.
 
 **Why this target:**
 
-I made this all-or-nothing because it's a constraint on generation, not retrieval, so it should hold regardless of what was retrieved or how hard the question was. A looser target would just mean tolerating the prompt being ignored some of the time.
+Criterion 2 only checks that a filename appears, so an answer could cite the
+wrong file and still pass all four of my other criteria. I picked 4 of 5 rather
+than 5 of 5 because the model is handed 5 chunks, not 1, and on "maximum working
+hours" four of those five are course workload files that have nothing to do with
+on-campus jobs — that is the question I expect to be miscited if any of them is.
+I didn't go looser than 4 because a system that attaches the wrong filename to
+one answer in three is worse than one that cites nothing at all: a wrong source
+looks exactly like a right one until you go and check it.
 
 ---
 
