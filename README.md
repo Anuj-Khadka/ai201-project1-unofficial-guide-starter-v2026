@@ -503,7 +503,7 @@ would have come out 4 of 5.
 All five criteria were met. Nothing was close, so the "how I decided" column below 
 is about *how I measured* rather than how I weighed a borderline call.
 
-| # | Criterion | Verdict | How I decided |
+| # | Criterion                                                       | Verdict | How I decided |
 |---|---|---|---|
 | 1 | Retrieved chunks contain the answer                             |  |  |
 | 2 | Every answer names a source                                     |  |  |
