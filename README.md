@@ -580,6 +580,30 @@ the results would make them look sharper than they were.
 
      Milestone 3. -->
 
+**Missed Nothing**: all five criteria met on all three runs. As per the brief, 
+that usually means the targets were safe. The answer chunk came back at rank 1
+on all five questions when my target only asked for it in the top 5, the closest
+out-of-scope question sat 0.225 clear of the cutoff, and my smallest chunk is 15 
+words against an 8 word floor. The pattern behind that is one oversight - 
+criteria 1 and 4 measure retrieval and chunking, 2 measures formatting, 3 and 5 measure 
+the gate and citation.
+My `expects` for the shuttle question is `20 minutes`, and the rank-1 chunk (0.207) says 
+"Runs a loop **every 20 minutes** from 7am to 11pm on weekdays." All three runs answered 
+"The campus shuttle runs from 7am to 11pm on weekdays." **Stage: generation** — retrieval 
+worked fine. **Mechanism:** the question asks "what *time*", so the model gave the operating 
+window and dropped the frequency, and the only instruction about how much to say is 
+`GROUNDING_INSTRUCTION`'s "be brief, two or three sentences," which pushes against completeness. 
+All five criteria pass on that answer anyway. The criterion I'd tighten is **3**: my out-of-scope 
+questions are from a different world entirely (Mongolia, Rust, diesel engines), so the gate only
+had to tell a dorm from an engine — campus-adjacent questions the corpus doesn't cover would make 
+the 0.6 cutoff do real work, and I'd keep the 4 of 5 target because against those it would genuinely be at risk.
+
+
+
+
+
+
+
 ## The Improvement
 
 **What I changed:**
