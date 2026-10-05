@@ -503,13 +503,62 @@ would have come out 4 of 5.
 All five criteria were met. Nothing was close, so the "how I decided" column below 
 is about *how I measured* rather than how I weighed a borderline call.
 
-| # | Criterion                                                       | Verdict | How I decided |
-|---|---|---|---|
-| 1 | Retrieved chunks contain the answer                             |  |  |
-| 2 | Every answer names a source                                     |  |  |
-| 3 | The relevance gate stops out-of-corpus questions                |  |  |
-| 4 | Size of the chunk                                               |  |  |
-| 5 | The source an answer names is the one the fact came from        |  |  |
+| # | Criterion                                                       | Target     | Verdict   | How I decided |
+|---|---|---|---| ---|
+| 1 | Retrieved chunks contain the answer                             | 4/5         | MET      |Checked the text of the retrieved **chunks**, not just the filenames in the `Sources retrieved:` line. For all five questions the `expects` phrase appears inside a chunk that was actually returned.  |
+| 2 | Every answer names a source                                     | 5/5         | MET      |Read all 15 answers. Every one contains a filename. The format drifted between runs — inline parentheses, `(from X)`, a `Source:` line — but presence never failed.  |
+| 3 | The relevance gate stops out-of-corpus questions                | 4/5         | MET      |One deterministic pass through `gate.py::check`. All five refused, closest at 0.825 against a 0.6 cutoff.  |
+| 4 | Size of the chunk                                               | every chunk | MET      | Measured both halves separately: smallest chunk is 15 words, so 0 of 142 fall under 8; and 0 of 142 chunk bodies end without terminal punctuation. |
+| 5 | The source an answer names is the one the fact came from        | 4/5         | MET      | Opened each named file and looked for the stated fact. All five check out. |
+
+
+### Where my unit 1 reasoning turned out to be wrong
+
+Criterion 3 is met, but not for the reason I gave. In unit 1 I wrote that I
+expected "one of my out-of-scope questions uses words that also appear in my
+documents, so I expect it to score close enough to sneak past the gate." None
+of them came close — the nearest was "What is the capital of Mongolia?" at
+0.825, and the 0.6 cutoff was never threatened. The verdict stands; the
+prediction behind it did not.
+
+### Criterion 4 needed two measurements, not one
+
+My criterion has two clauses — at least 8 words, **and** reads as at least one
+complete sentence — and the `142/142` in my run log would only have measured
+the first. I counted the second separately: no chunk body ends without
+terminal punctuation, which follows from splitting on paragraph boundaries,
+since no sentence is ever cut mid-way. Had I reported 142/142 off the word
+count alone, the number would have been claiming more than I had checked.
+
+### Criterion 5, and the case I checked hardest
+
+The STAT 150 answers name two files:
+`(Sources: course_stat_150_exams.txt and course_stat_150.txt)`
+
+A second file named alongside the right one is the obvious way this criterion
+fails, so I read both. `course_stat_150.txt` is not only a course overview — it
+contains the line "Assessment: three equally weighted midterms, no final. No
+curve, but the lowest midterm is dropped." Both named files genuinely carry the
+fact. Had the second one held only workload information, this would have been a
+miscitation and the criterion would have come out 4 of 5.
+
+I also noticed the wording is looser than I realised when I wrote it. "The fact
+in the answer" is singular, but the STAT 150 answers assert four things — three
+midterms, no final, no curve, lowest dropped — and the criterion doesn't say
+what to do if a named file supported only some of them. Here all four are in
+`course_stat_150_exams.txt`, so it didn't matter.
+
+### On revising
+
+I considered revising criteria 4 and 5 — 4 because it bundles two clauses into
+one sentence, 5 because of the singular/plural looseness above. I revised
+neither. The unit 2 rule is that a revision earns credit when a criterion
+*couldn't be measured*, and both of mine could: I measured 4 as two separate
+counts and 5 by opening the named files. Loose wording I managed to measure
+anyway is not the same as a broken criterion, and rewriting them after seeing
+the results would make them look sharper than they were.
+
+---
 
 ## Diagnoses
 
