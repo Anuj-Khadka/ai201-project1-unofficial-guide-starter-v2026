@@ -506,7 +506,7 @@ is about *how I measured* rather than how I weighed a borderline call.
 | # | Criterion | Verdict | How I decided |
 |---|---|---|---|
 | 1 | Retrieved chunks contain the answer                             |  |  |
-| 2 | Every answer names a source                      |  |  |
+| 2 | Every answer names a source                                     |  |  |
 | 3 | The relevance gate stops out-of-corpus questions                |  |  |
 | 4 | Size of the chunk |  |  |
 | 5 | The source an answer names is the one the fact came from        |  |  |
