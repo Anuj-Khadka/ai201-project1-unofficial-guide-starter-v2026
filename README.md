@@ -506,7 +506,7 @@ is about *how I measured* rather than how I weighed a borderline call.
 | # | Criterion | Verdict | How I decided |
 |---|---|---|---|
 | 1 | Retrieved chunks contain the answer |  |  |
-| 2 |  |  |  |
+| 2 | Every answer names a source |  |  |
 | 3 |  |  |  |
 | 4 |  |  |  |
 | 5 |  |  |  |
