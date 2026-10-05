@@ -340,27 +340,154 @@ on evidence I asked for rather than on the advice itself.
 
 ## Run Log — Before
 
-<!-- Your five criteria, three runs each. `python run_eval.py --label before`
-     runs the questions, puts the OUT_OF_SCOPE ones through the gate, and
-     writes it all into results/ for you. Targets come from criteria.md; the
-     verdict column is your call.
-
-     Criterion 3 is measured in one deterministic pass rather than three, so
-     the same number goes in all three run columns. That's correct, not lazy.
-
-     Milestone 1. -->
+Five questions, three runs each, caching off. The raw per-question output is
+committed in `results/run_2026-10-04_1940_before.md`, produced by
+`run_eval.py::main`. The table below aggregates those rows into one row per
+criterion.
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1. Retrieved chunk contains the answer | 4 of 5 |  |  |  |  |
-| 2. Every answer names a source | 5 of 5 |  |  |  |  |
-| 3. Gate stops out-of-corpus questions | 4 of 5 |  |  |  |  |
-| 4. | | | | | |
-| 5. | | | | | |
+| 1. Retrieved chunks contain the answer | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 2. Every answer names a source | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 3. Gate stops out-of-corpus questions | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 4. Every chunk is at least 8 words and a complete sentence | every chunk | 142/142 | 142/142 | 142/142 | MET |
+| 5. The named source contains the fact | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
 
-<!-- Underneath, paste the REAL output for each criterion from one of your
-     runs — the actual text your system produced, not a description of it.
-     Name the file and function that produced it. -->
+Criteria 3 and 4 carry the same number in all three columns because both are
+measured in one deterministic pass — the gate is a comparison against a fixed
+cutoff, and chunking never involves the model. Criteria 1, 2 and 5 could have
+moved and didn't: I read all fifteen answers, and while the wording varied
+between runs, what each answer asserted and cited did not.
+
+### Criterion 1 — retrieved chunks contain the answer
+
+Target 4 of 5. Result 5 of 5 on every run.
+Produced by `store.py::search`, over chunks from `chunker.py::split_documents`.
+
+```
+### How much does it cost to wash clothes in Old Brewhouse? — run 1
+
+- Best distance: 0.1726 (passed the gate)
+- Sources retrieved: housing_calder_annexe.txt, housing_fenwick_court_laundry.txt, housing_innisfree_hall_laundry.txt, housing_old_brewhouse.txt, housing_old_brewhouse_laundry.txt
+```
+
+```
+### What is the maximum working hours during the terms? — run 1
+
+- Best distance: 0.3483 (passed the gate)
+- Sources retrieved: course_econ_101_workload.txt, course_engl_205_workload.txt, course_phys_130_workload.txt, course_stat_150_workload.txt, money_jobs.txt
+```
+
+The answer-bearing file is present in both — `housing_old_brewhouse.txt` in the
+first, `money_jobs.txt` in the second — and the same held for the other three
+questions (`admin_study_abroad.txt`, `course_stat_150_exams.txt`,
+`transit_shuttle.txt`). I kept the second block even though it passed, because
+four of its five retrieved files are course workload documents with nothing to
+do with on-campus jobs. The criterion is met and the retrieval around it is
+still noisy.
+
+### Criterion 2 — every answer names a source
+
+Target 5 of 5. Result 5 of 5 on every run, so 15 of 15 answers overall.
+Produced by `generate.py::answer_from_chunks`, under the system instruction in
+`generate.py::GROUNDING_INSTRUCTION`.
+
+```
+The maximum is 20 hours a week during the term (money_jobs.txt).
+```
+
+```
+The campus shuttle runs from 7am to 11pm on weekdays. 
+
+Source: transit_shuttle.txt
+```
+
+The citation format drifted between runs — inline parentheses, `(from X)`, or a
+`Source:` line of its own — but a filename appeared every time.
+
+### Criterion 3 — the gate stops out-of-corpus questions
+
+Target 4 of 5. Result 5 of 5 refused.
+Produced by `run_eval.py::check_out_of_scope`, deciding with `gate.py::check`
+against the 0.6 cutoff in `config.py`.
+
+```
+| Out-of-scope question | Best distance | Gate |
+|---|---|---|
+| What is the capital of Mongolia? | 0.825 | refused |
+| How do I change the oil in a diesel engine? | 0.923 | refused |
+| Who won the 1994 World Cup? | 0.886 | refused |
+| What is the recommended dosage of ibuprofen for a headache? | 0.848 | refused |
+| How do I write a for loop in Rust? | 0.877 | refused |
+
+-> gate refused 5 of 5
+```
+
+The closest of the five sat at 0.825, well clear of the 0.6 cutoff, and none
+reached the model — a refused question costs no API quota.
+
+### Criterion 4 — every chunk is at least 8 words and a complete sentence
+
+Target: every chunk. Result 142 of 142, smallest 15 words, none under 8.
+Produced by `chunker.py::split_documents`, summarised by `chunker.py::describe`.
+
+```
+> python app.py index
+  loaded   88 documents, 27,908 characters, ~317 characters per document
+  chunked  142 chunks, 206 characters on average (shortest 90, longest 397), produced by chunker.py::split_documents
+```
+
+```
+> python app.py chunks -n 1
+
+======================================================================
+Chunk 1  |  source: admin_add_drop_deadline.txt#0  |  produced by: chunker.py::split_documents
+======================================================================
+On the add/drop deadline
+
+You can add a course through the end of the second week. Dropping is a longer window — through the end of week six — but a drop after week two shows as a W on your transcript. Nothing anywhere on the registrar's site says this plainly, and students find out from each other.
+```
+
+`shortest 90` in the summary line is the evidence: 90 characters is 15 words,
+comfortably over the 8-word floor. This criterion never involves the model, so
+it is identical on every run by construction.
+
+### Criterion 5 — the source an answer names is the one the fact came from
+
+Target 4 of 5. Result 5 of 5 on every run.
+Produced by `generate.py::answer_from_chunks`.
+
+Checking this one means putting the answer next to the file it named, because
+neither piece demonstrates anything alone.
+
+The answer:
+
+```
+The maximum is 20 hours a week during the term (money_jobs.txt).
+```
+
+What `corpora/campus_life/documents/money_jobs.txt` actually says:
+
+```
+On-campus work
+
+Library and dining jobs post in the first week of each semester and go fast. Pay is the same across departments — the difference is whether you can study during the shift. Library desk: usually yes. Dining: no.
+
+Maximum is 20 hours a week during term. Most people find 10 to 12 is the point where it stops affecting coursework.
+```
+
+The fact is in the file that was named. The same check passed on the other four.
+The one that needed care was STAT 150, where the answer named two files:
+
+```
+(Sources: `course_stat_150_exams.txt` and `course_stat_150.txt`)
+```
+
+`course_stat_150.txt` is not only the course overview — it contains the line
+"Assessment: three equally weighted midterms, no final. No curve, but the lowest
+midterm is dropped," so both named files genuinely carry the fact. Had it held
+only workload information, that would have been a miscitation and this criterion
+would have come out 4 of 5.
 
 ## Verdicts
 
