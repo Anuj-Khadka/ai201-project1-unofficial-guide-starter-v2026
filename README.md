@@ -326,6 +326,14 @@ rule that question went to 0.3483 at rank 1, the shuttle question went from
 out-of-scope groups went from 0.29 to 0.48. I changed the rule I'd been given,
 on evidence I asked for rather than on the advice itself.
 
+**3. Unit 2 — decoding my scorer.** When `run_eval.py` reported 2 of 5, I worked
+through the output with an AI tool to separate real failures from measurement
+artifacts. It pointed out that two of the three fails were my `expects` strings
+being too literal rather than wrong answers; I confirmed that myself by reading
+each answer against its source file. The shuttle miss it flagged as genuine, and
+reading the retrieved chunk showed why — the "every 20 minutes" frequency was
+right there and the model dropped it.
+
 
 <!-- ── Stretch features ─────────────────────────────────────────────────────
      Doing one? Say so here BEFORE you start. A feature this README never
@@ -339,14 +347,6 @@ on evidence I asked for rather than on the advice itself.
 <!-- These sections get ADDED to what's already above. Don't delete or rewrite
      unit 1 — the point is that someone can see what you said before you knew
      how it went. -->
-
-**Unit 2 — decoding my scorer.** When `run_eval.py` reported 2 of 5, I worked
-through the output with an AI tool to separate real failures from measurement
-artifacts. It pointed out that two of the three fails were my `expects` strings
-being too literal rather than wrong answers; I confirmed that myself by reading
-each answer against its source file. The shuttle miss it flagged as genuine, and
-reading the retrieved chunk showed why — the "every 20 minutes" frequency was
-right there and the model dropped it.
 
 
 ## Run Log — Before
@@ -607,9 +607,10 @@ window and dropped the frequency, and the only instruction about how much to say
 All five criteria pass on that answer anyway. The criterion I'd tighten is **3**: my out-of-scope 
 questions are from a different world entirely (Mongolia, Rust, diesel engines), so the gate only
 had to tell a dorm from an engine — campus-adjacent questions the corpus doesn't cover would make 
-the 0.6 cutoff do real work, and I'd keep the 4 of 5 target because against those it would genuinely be at risk.
-
-
+the 0.6 cutoff do real work, and I'd tighten the target itself from 4 of 5 to **5 of 5**: the looser 4 of 5
+existed to let one semantically-close out-of-scope question slip through, but if
+I'm deliberately choosing campus-adjacent questions then the gate should have to
+catch all of them for me to trust it.
 
 
 
