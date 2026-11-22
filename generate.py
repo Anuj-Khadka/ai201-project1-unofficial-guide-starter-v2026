@@ -279,6 +279,7 @@ Rules:
 - Use only the information in the documents below. Do not use anything you know from elsewhere.
 - If the documents don't cover the question, say you don't have enough information. Do not guess.
 - Name the document your answer came from, using the filename given in each excerpt.
+- If the question asks for a specific figure — a time, frequency, cost, quantity, or date — include that exact figure from the documents, even if it adds a short clause.
 - Be brief. Two or three sentences is usually enough."""
 
 

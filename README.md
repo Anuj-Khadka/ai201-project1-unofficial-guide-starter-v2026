@@ -342,6 +342,20 @@ right there and the model dropped it.
 
 ---
 
+## Stretch — Second improvement: grounding for specific figures
+
+**Declared before building.** My second measured improvement is a tightened
+grounding prompt. My Milestone 4 test found one genuine generation miss: the
+shuttle answer dropped "every 20 minutes" even though the retrieved chunk
+contained it, because `GROUNDING_INSTRUCTION` only told the model to "be brief."
+I'm adding a rule that it must include any specific figure the question asks for
+(a time, frequency, cost, quantity, or date). My hypothesis is that this fixes
+the shuttle answer and nothing else — so `scorer.py` should move from 2 of 5 to
+3 of 5, while my five criteria stay MET, since none of them measures answer
+completeness. I'm measuring it with semantic retrieval (hybrid off) against my
+before log, so the prompt is the only variable. I'll report what actually
+happened.
+
 # Unit 2
 
 <!-- These sections get ADDED to what's already above. Don't delete or rewrite
@@ -643,7 +657,6 @@ is the fix my diagnosis pointed at.
      `python run_eval.py --label after` -->
 
 
-
 `AI201_RETRIEVAL=hybrid python run_eval.py --label after`, five questions, three
 runs each, caching off. Raw per-question output in
 `results/run_2026-11-22_1644_after.md`.
@@ -703,6 +716,55 @@ common words in my questions ("hours," "term") as readily as the rare ones, so
 it reshuffled the noise rather than cutting it. I can tell it didn't help
 because the question it was meant to improve came back with the same count of
 off-topic files.
+
+
+
+
+
+### Run Log — After (second improvement: grounding for specific figures)
+
+`python run_eval.py --label after2`, semantic retrieval (hybrid off), five
+questions, three runs each, caching off. Raw output in
+`results/run_2026-11-22_1720_after2.md`.
+
+
+
+
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. Retrieved chunks contain the answer | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 2. Every answer names a source | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 3. Gate stops out-of-corpus questions | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 4. Every chunk is at least 8 words and a complete sentence | every chunk | 142/142 | 142/142 | 142/142 | MET |
+| 5. The named source contains the fact | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+
+
+
+
+**Did it help? No — my hypothesis was wrong.** I predicted the new rule would
+make the shuttle answer include "every 20 minutes" and move the scorer from 2 of
+5 to 3 of 5. It didn't: all three runs still answered "The campus shuttle runs
+from 7am to 11pm on weekdays," the scorer stayed at 2 of 5, and every criterion
+stayed MET.
+
+Why it didn't fire: the miss isn't in the prompt, it's in the question. "What
+time does the shuttle run on weekdays?" is answerable two ways — the operating
+window (7am–11pm) or the frequency (every 20 minutes) — and the model reads it as
+the window. My rule said to include "any specific figure the question asks for,"
+and the model judged the window to be that figure, so the rule had nothing to
+correct. A prompt rule can make the model keep a figure it already thinks is
+relevant; it can't make it guess which of two readings I meant. To actually fix
+this I'd have to make the question unambiguous ("how often does the shuttle
+run?") or score on the retrieved chunk instead of the generated sentence — both
+of which are test changes, not system changes. I kept the grounding rule in
+place because it's harmless and correct in principle; it simply had nothing to
+bite on here.
+
+
+
+
+
 
 ## What's Still Broken
 
