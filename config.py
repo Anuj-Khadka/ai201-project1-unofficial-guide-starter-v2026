@@ -63,6 +63,33 @@ TOP_K = 5               # how many chunks to pull back per question
 THRESHOLD = 0.6
 
 
+
+# ---- Retrieval mode (Unit 2 Milestone 4 improvement)  -----------------------
+
+# "semantic" is the original pipeline" embedding similarity only.
+# 
+# "hybrid"   adds BM25 keyword search and fuses the two rankings (Reciprocal
+#            Rank Fusion), so a question's exact terms ("hours", "jobs") count
+#            alongside meaning.
+#
+# Flip it on for a single run without editing this file:
+#     AI201_RETRIEVAL=hybrid python run_eval.py --label after
+#
+# The gate is untouched: every returned chunk keeps its real cosine distance,
+# so THRESHOLD still means what it meant. Fusion only changes order and which
+# top-k survive.
+RETRIEVAL_MODE = os.getenv("AI201_RETRIEVAL", "semantic")
+
+# Hybrid only: how many semantic neighbours to pull before BM25 re-ranks them.
+HYBRID_CANDIDATES = 50
+
+# Hybrid only: the RRF constant (60 is the value from the RRF paper). Higher
+# flattens the weighting across ranks.
+RRF_K = 60
+
+
+
+
 # ─── Models ──────────────────────────────────────────────────────────────────
 # Embeddings run on your own machine and cost no API quota.
 # Only generation calls out to a service.

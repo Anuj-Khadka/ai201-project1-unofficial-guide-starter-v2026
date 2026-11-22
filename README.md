@@ -288,6 +288,8 @@ question, results 3, 4 and 5 sit at 0.656, 0.685 and 0.700 — all worse than 0.
 all sent anyway. Filtering every retrieved chunk against the threshold, rather
 than just the closest one, is the first thing I would change.
 
+
+
 ## How I Used AI
 
 
@@ -337,6 +339,15 @@ on evidence I asked for rather than on the advice itself.
 <!-- These sections get ADDED to what's already above. Don't delete or rewrite
      unit 1 — the point is that someone can see what you said before you knew
      how it went. -->
+
+**Unit 2 — decoding my scorer.** When `run_eval.py` reported 2 of 5, I worked
+through the output with an AI tool to separate real failures from measurement
+artifacts. It pointed out that two of the three fails were my `expects` strings
+being too literal rather than wrong answers; I confirmed that myself by reading
+each answer against its source file. The shuttle miss it flagged as genuine, and
+reading the retrieved chunk showed why — the "every 20 minutes" frequency was
+right there and the model dropped it.
+
 
 ## Run Log — Before
 
@@ -606,9 +617,21 @@ the 0.6 cutoff do real work, and I'd keep the 4 of 5 target because against thos
 
 ## The Improvement
 
-**What I changed:**
+**What I changed:** I added a hybrid retrieval mode to `store.py`
+(`_hybrid_search`, selected by `config.RETRIEVAL_MODE`). It pulls the top 50
+semantic neighbours, re-ranks them with BM25 keyword scoring over the same
+pool, and fuses the two orderings with Reciprocal Rank Fusion
+(`1/(60 + rank)` from each list, summed). Every returned chunk keeps its real
+cosine distance, so the gate and the 0.6 cutoff are untouched — the change is
+retrieval order only. "Before" is semantic-only; "after" is
+`AI201_RETRIEVAL=hybrid python run_eval.py --label after`.
 
-**Why I picked it:**
+**Why I picked it:** My Milestone 1 note on the "maximum working hours"
+question flagged that four of its five retrieved files were
+`course_*_workload.txt` documents with nothing to do with on-campus jobs — a
+retrieval-stage noise problem. The question contains the exact terms "working
+hours," which semantic search glides past but BM25 matches directly, so hybrid
+is the fix my diagnosis pointed at.
 
 <!-- Connect it to a specific diagnosis above in one sentence. If you can't,
      you picked a fix because it sounded impressive. -->
@@ -618,13 +641,46 @@ the 0.6 cutoff do real work, and I'd keep the 4 of 5 target because against thos
 <!-- Same format, same five criteria, three runs each.
      `python run_eval.py --label after` -->
 
+
+
+`AI201_RETRIEVAL=hybrid python run_eval.py --label after`, five questions, three
+runs each, caching off. Raw per-question output in
+`results/run_2026-11-22_1644_after.md`.
+
+
+
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1. Retrieved chunk contains the answer | 4 of 5 |  |  |  |  |
-| 2. Every answer names a source | 5 of 5 |  |  |  |  |
-| 3. Gate stops out-of-corpus questions | 4 of 5 |  |  |  |  |
-| 4. | | | | | |
-| 5. | | | | | |
+| 1. Retrieved chunks contain the answer | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 2. Every answer names a source | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 3. Gate stops out-of-corpus questions | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 4. Every chunk is at least 8 words and a complete sentence | every chunk | 142/142 | 142/142 | 142/142 | MET |
+| 5. The named source contains the fact | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+
+
+
+Criteria 3 and 4 are one deterministic pass each (the gate is a fixed-cutoff
+comparison; chunking never runs the model, and hybrid doesn't touch the
+chunker). Criteria 1, 2 and 5 held on every run.
+
+
+**A note on the auto-scorer, because the raw number looks alarming.**
+`run_eval.py` now marks each question with `scorer.py::judge`, which checks
+whether the generated *answer* contains the `expects` phrase. It came out
+**2 of 5**, identical before and after. That is not one of my criteria — none
+of the five tests "the answer contains `expects`." Decoding the three fails:
+
+- **Working hours** — `expects` is `"20 hours per week."`; the answer says "20
+  hours a week." Same fact, my phrasing was too literal.
+- **Laundry** — `expects` is `"$1.50 wash."`; the answer says "$1.50 to wash
+  clothes." Same fact, brittle `expects` again.
+- **Shuttle** — `expects` is `"20 minutes"`; the answer says "7am to 11pm" and
+  drops the frequency. This one is a real miss at the generation stage: the
+  rank-1 chunk (0.207) says "Runs a loop every 20 minutes," and the model left
+  it out.
+
+So the scorer agreed exactly before and after, and two of its three complaints
+are about my test phrasing, not my system.
 
 **Did it help?**
 
@@ -634,6 +690,18 @@ the 0.6 cutoff do real work, and I'd keep the 4 of 5 target because against thos
      tell.
 
      Milestone 4. -->
+
+
+No. Against my five criteria, every verdict is MET before and
+after — identical to the before log. Against the scorer, it is 2 of 5 both
+ways. Its only visible effect is in the `Sources retrieved:` lines: on the
+working-hours question it dropped `course_phys_130_workload.txt` but pulled in
+`study_group_rooms.txt` — another file that merely contains the word "hours" —
+so the top-5 held four irrelevant files before and four after. BM25 matched the
+common words in my questions ("hours," "term") as readily as the rare ones, so
+it reshuffled the noise rather than cutting it. I can tell it didn't help
+because the question it was meant to improve came back with the same count of
+off-topic files.
 
 ## What's Still Broken
 
@@ -645,9 +713,40 @@ the 0.6 cutoff do real work, and I'd keep the 4 of 5 target because against thos
 
      Milestone 5. -->
 
+Against my five criteria nothing is missed, so this is about what the test
+exposed underneath a passing scorecard.
+
+- **Retrieval noise (retrieval stage).** The working-hours question still
+  returns four files with nothing to do with on-campus jobs. Hybrid search was
+  my attempt and it didn't move the count. Next I'd weight the semantic rank
+  above BM25 in the fusion — BM25 is matching common words ("hours," "term")
+  that appear in every workload file — or down-weight course-workload files for
+  job questions. I stopped here because the brief asks for one measured change,
+  and a second tuning pass would blur what the first one did.
+- **Answer completeness (generation stage).** The shuttle answer drops "every
+  20 minutes" even though the rank-1 chunk contains it. The cause is
+  `GROUNDING_INSTRUCTION`'s "be brief, two or three sentences," which trades
+  completeness for brevity. The fix would be to tell the model to keep any
+  specific figure the question asks for (time, frequency, cost). I didn't make
+  it because it wasn't the change my retrieval diagnosis pointed at, and the
+  rule is one change this unit.
+
 ## What I'd Do Differently
 
 <!-- Knowing what you know now — which of your five criteria would you write
      differently, and why?
 
      Milestone 5. -->
+
+
+- **My `expects` phrases were too literal.** Two of the three scorer fails —
+  `"20 hours per week."` and `"$1.50 wash."` — are phrasings my correct answers
+  didn't match word for word. I'd use the shortest unambiguous token the fact
+  must contain (`"20 hours"`, `"$1.50"`), so the scorer measures whether the
+  fact is present, not whether the model phrased it my way.
+- **None of my five criteria check whether the answer is correct.** They cover
+  retrieval (1), citation (2, 5), the gate (3) and chunk shape (4) — every
+  stage except whether the final answer states the right fact. The scorer I
+  built this unit does measure that, and it's what caught the shuttle gap. I'd
+  add a sixth criterion — "for at least 4 of 5 questions, the answer contains
+  the fact in `expects`" — which is exactly what `scorer.py` already tests.

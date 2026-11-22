@@ -17,7 +17,7 @@ rest of the project if they were wrong:
    install needs neither PyTorch nor a reachable Hugging Face. See `_embedder`.
 """
 
-import os
+import os, re
 import shutil
 from dataclasses import dataclass
 
@@ -185,11 +185,29 @@ def search(
     variant: str = "default",
 ) -> list[Result]:
     """
-    Retrieve the chunks closest in meaning to a question.
+    Retrieve the chunks closest to a question, nearest-first, each with its
+    distance.
 
-    Returns them nearest-first, each with its distance.
+    Dispatches on config.RETRIEVAL_MODE: "semantic" (embedding similarity only,
+    the original pipeline) or "hybrid" (embeddings + BM25 keyword search, fused
+    by Reciprocal Rank Fusion). Both return the same Result shape, and in both
+    every Result carries its true cosine distance, so the gate is unaffected.
     """
     top_k = top_k or config.TOP_K
+    if getattr(config, "RETRIEVAL_MODE", "semantic") == "hybrid":
+        return _hybrid_search(question, top_k, corpus, variant)
+    return _semantic_search(question, top_k, corpus, variant)
+
+
+def _semantic_search(
+    question: str,
+    top_k: int,
+    corpus: str | None,
+    variant: str,
+    n_results: int | None = None,
+) -> list[Result]:
+    """Embedding similarity only. `n_results` overrides how many to pull back —
+    hybrid asks for a wider candidate pool than it finally returns."""
     name = config.collection_name(corpus, variant)
 
     try:
@@ -201,7 +219,7 @@ def search(
 
     raw = collection.query(
         query_embeddings=embed([question]),
-        n_results=min(top_k, collection.count()),
+        n_results=min(n_results or top_k, collection.count()),
     )
 
     results: list[Result] = []
@@ -218,6 +236,47 @@ def search(
             )
         )
     return results
+
+
+def _tokenize(text: str) -> list[str]:
+    """Words for BM25: lowercase alphanumeric runs."""
+    return re.findall(r"[a-z0-9]+", text.lower())
+
+
+def _hybrid_search(
+    question: str,
+    top_k: int,
+    corpus: str | None,
+    variant: str,
+) -> list[Result]:
+    """
+    Pull a wide semantic candidate pool, then let BM25 keyword search re-rank it
+    and fuse the two orderings with Reciprocal Rank Fusion.
+
+    Every chunk returned keeps the cosine distance it got from the embedding
+    search, so gate.check still compares a real distance against THRESHOLD.
+    """
+    from rank_bm25 import BM25Okapi
+
+    pool = _semantic_search(
+        question, top_k, corpus, variant, n_results=config.HYBRID_CANDIDATES
+    )
+    if len(pool) <= top_k:
+        return pool  # nothing to re-rank
+
+    # `pool` is already nearest-first, so a chunk's index IS its semantic rank.
+    bm25 = BM25Okapi([_tokenize(r.text) for r in pool])
+    scores = bm25.get_scores(_tokenize(question))
+    bm25_order = sorted(range(len(pool)), key=lambda i: scores[i], reverse=True)
+    bm25_rank = {i: rank for rank, i in enumerate(bm25_order)}
+
+    k = config.RRF_K
+
+    def rrf(i: int) -> float:
+        return 1.0 / (k + i) + 1.0 / (k + bm25_rank[i])
+
+    fused = sorted(range(len(pool)), key=rrf, reverse=True)
+    return [pool[i] for i in fused[:top_k]]
 
 
 def index_exists(corpus: str | None = None, variant: str = "default") -> bool:
